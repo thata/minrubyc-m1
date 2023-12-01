@@ -11,6 +11,13 @@ def var_names(tree)
       arr += var_names(statement)
     end
     arr
+  elsif tree[0] == "if"
+    arr = []
+    arr += var_names(tree[2])
+    if tree[3]
+      arr += var_names(tree[3])
+    end
+    arr
   else
     []
   end
@@ -104,6 +111,24 @@ def gen(tree, env)
 
     # ローカル変数領域からx0へ値をロード
     puts "\tldr x0, [fp, ##{var_offset(name, env)}]"
+  elsif tree[0] == "if"
+    cond, texpr, fexpr = tree[1], tree[2], tree[3]
+    # 条件式を評価
+    puts "\t// 条件式を評価"
+    gen(cond, env)
+    puts "\tcmp x0, #0"
+
+    puts "\tbeq .Lelse#{tree.object_id}"
+
+    # 真の場合はtexprを評価
+    puts "\t// 真の場合"
+    gen(texpr, env)
+    puts "\tb .Lendif#{tree.object_id}"
+    puts ".Lelse#{tree.object_id}:"
+    # 偽の場合はfexprを評価
+    puts "\t// 偽の場合"
+    gen(fexpr, env) if fexpr
+    puts ".Lendif#{tree.object_id}:"
   else
     raise "invalid AST: #{tree}"
   end
@@ -125,6 +150,12 @@ puts "\tsub sp, sp, ##{16 + (lvar_size % 16 == 0 ? lvar_size : lvar_size + 8)}"
 # lr レジスタと fp レジスタをスタックに退避
 puts "\tstp fp, lr, [sp, #0]"
 puts "\tmov fp, sp"
+
+# ローカル変数を0で初期化
+env.each do |var|
+  puts "\tmov x0, #0"
+  puts "\tstr x0, [fp, ##{var_offset(var, env)}]"
+end
 
 gen(tree, env)
 
