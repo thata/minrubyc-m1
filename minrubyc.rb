@@ -45,6 +45,10 @@ def gen(tree)
     expr = tree[2]
     gen(expr)
     puts "\tbl _p"
+  elsif tree[0] == "stmts"
+    tree[1..].each do |stmt|
+      gen(stmt)
+    end
   else
     raise "invalid AST: #{tree}"
   end
