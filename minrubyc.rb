@@ -40,6 +40,11 @@ def gen(tree)
 
     # スタックを破棄
     puts "\tadd sp, sp, #16"
+  elsif tree[0] == "func_call" && tree[1] == "p"
+    # p 関数を呼び出す
+    expr = tree[2]
+    gen(expr)
+    puts "\tbl _p"
   else
     raise "invalid AST: #{tree}"
   end
@@ -56,9 +61,6 @@ puts "\tsub sp, sp, #16"
 puts "\tstp fp, lr, [sp, #0]"
 
 gen(tree)
-
-# 終了する前に x0 レジスタの値を出力するため、p 関数を呼び出す
-puts "\tbl _p"
 
 # lr レジスタと fp レジスタをスタックから復元
 puts "\tldp fp, lr, [sp, #0]"
