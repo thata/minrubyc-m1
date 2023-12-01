@@ -30,7 +30,7 @@ end
 def gen(tree, env)
   if tree[0] == "lit"
     puts "\tmov x0, ##{tree[1]}"
-  elsif %w(+ - * /).include?(tree[0])
+  elsif %w(+ - * / == != < <= > >=).include?(tree[0])
     op = tree[0]
     expr1 = tree[1]
     expr2 = tree[2]
@@ -60,6 +60,24 @@ def gen(tree, env)
       puts "\tmul x0, x0, x1"
     when "/"
       puts "\tsdiv x0, x0, x1"
+    when "=="
+      puts "\tcmp x0, x1"
+      puts "\tcset x0, eq"
+    when "!="
+      puts "\tcmp x0, x1"
+      puts "\tcset x0, ne"
+    when "<"
+      puts "\tcmp x0, x1"
+      puts "\tcset x0, lt"
+    when "<="
+      puts "\tcmp x0, x1"
+      puts "\tcset x0, le"
+    when ">"
+      puts "\tcmp x0, x1"
+      puts "\tcset x0, gt"
+    when ">="
+      puts "\tcmp x0, x1"
+      puts "\tcset x0, ge"
     else
       raise "invalid operator: #{op}"
     end
