@@ -22,3 +22,9 @@ $ ./a.out
 55
 $
 ```
+
+# Run tests
+
+```sh
+./test.sh
+```
