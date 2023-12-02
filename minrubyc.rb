@@ -40,6 +40,25 @@ def var_offset(var, env)
   env.index(var) * 8 + 16
 end
 
+# ユーザー定義関数を構文木より抽出
+def func_defs(tree)
+  if tree[0] == "func_def"
+    {
+      # 関数名をキーにして [関数名, 引数, 関数本体] を格納
+      tree[1] => tree[1..]
+    }
+  elsif tree[0] == "stmts"
+    tmp_hash = {}
+    tree[1..].each do |stmt|
+      tmp_hash.merge!(func_defs(stmt))
+    end
+    tmp_hash
+  else
+    {}
+  end
+end
+
+# 構文木をアセンブリコードとして出力
 def gen(tree, env)
   if tree[0] == "lit"
     puts "\tmov x0, ##{tree[1]}"
@@ -97,6 +116,8 @@ def gen(tree, env)
 
     # スタックを破棄
     puts "\tadd sp, sp, #16"
+  elsif tree[0] == "func_def"
+    # 関数の定義はコンパイル時にコードとして出力されるため、実行時には何も行わなくて良い
   elsif tree[0] == "func_call"
     name, *args = tree[1..]
 
@@ -117,7 +138,7 @@ def gen(tree, env)
     end
 
     # 関数呼び出し
-    puts "\tbl _#{name}"
+    puts "\tbl _minruby_#{name}"
   elsif tree[0] == "stmts"
     tree[1..].each do |stmt|
       gen(stmt, env)
@@ -165,12 +186,55 @@ def gen(tree, env)
   end
 end
 
+# 関数定義をアセンブリコードとして出力
+def gen_func_def(func_def)
+  name, params, body = func_def
+  lenv = var_names(body)
+  env = params + lenv
+
+  # 名前が衝突しないように、関数名の先頭に _minruby_ を付与
+  puts "\t.globl _minruby_#{name}"
+  puts "_minruby_#{name}:"
+
+  # 関数プロローグ
+  lvar_size = env.size * 8
+  puts "\tsub sp, sp, ##{16 + (lvar_size % 16 == 0 ? lvar_size : lvar_size + 8)}" # NOTE: スタックのサイズは16の倍数でなければならない
+  puts "\tstp fp, lr, [sp, #0]"
+  puts "\tmov fp, sp"
+  # スタック上のパラメータ領域を初期化
+  params.each_with_index do |param, i|
+    puts "\tstr #{PARAM_REGISTERS[i]}, [fp, ##{var_offset(param, env)}]"
+  end
+  # ローカル変数を初期化
+  lenv.each do |var|
+    puts "\tmov x0, #0"
+    puts "\tstr x0, [fp, ##{var_offset(var, env)}]"
+  end
+
+  gen(body, env)
+
+  # 関数エピローグ
+  puts "\tldp fp, lr, [sp, #0]"
+  puts "\tadd sp, sp, ##{16 + (lvar_size % 16 == 0 ? lvar_size : lvar_size + 8)}" # NOTE: スタックのサイズは16の倍数でなければならない
+  puts "\tret"
+end
+
 tree = minruby_parse(ARGF.read)
 env = var_names(tree)
 lvar_size = env.size * 8
 
+# ユーザー定義関数を構文木より抽出
+func_defs = func_defs(tree)
+
 puts "\t.text"
 puts "\t.align 2"
+
+# ユーザー定義関数をアセンブリコードとして出力
+func_defs.values.each do |func_def|
+  gen_func_def(func_def)
+end
+
+# メイン関数
 puts "\t.globl _main"
 puts "_main:"
 
