@@ -1,6 +1,9 @@
 # minrubyc.rb
 require "minruby"
 
+# 引数用レジスタの一覧
+PARAM_REGISTERS = %w(x0 x1 x2 x3 x4 x5 x6 x7)
+
 # tree 内に含まれる、var_assign で定義される変数名の一覧
 def var_names(tree)
   if tree[0] == "var_assign"
@@ -94,11 +97,27 @@ def gen(tree, env)
 
     # スタックを破棄
     puts "\tadd sp, sp, #16"
-  elsif tree[0] == "func_call" && tree[1] == "p"
-    # p 関数を呼び出す
-    expr = tree[2]
-    gen(expr, env)
-    puts "\tbl _p"
+  elsif tree[0] == "func_call"
+    name, *args = tree[1..]
+
+    # 引数用のレジスタは8つしかないので、引数が8個以上の場合はエラー
+    raise "too many arguments (given #{args.size}, expected 8)" if args.size > 8
+
+    # 引数を評価してスタックへ積む
+    args.reverse.each do |arg|
+      gen(arg, env)
+      puts "\tsub sp, sp, #16"
+      puts "\tstr x0, [sp, #0]"
+    end
+
+    # スタックへ詰んだ引数の値を、引数用レジスタへセット
+    args.each_with_index do |arg, i|
+      puts "\tldr #{PARAM_REGISTERS[i]}, [sp, #0]"
+      puts "\tadd sp, sp, #16"
+    end
+
+    # 関数呼び出し
+    puts "\tbl _#{name}"
   elsif tree[0] == "stmts"
     tree[1..].each do |stmt|
       gen(stmt, env)
