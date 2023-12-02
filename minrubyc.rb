@@ -18,6 +18,9 @@ def var_names(tree)
       arr += var_names(tree[3])
     end
     arr
+  elsif tree[0] == "while"
+    puts "\t// while: #{tree}"
+    var_names(tree[2])
   else
     []
   end
@@ -129,6 +132,15 @@ def gen(tree, env)
     puts "\t// 偽の場合"
     gen(fexpr, env) if fexpr
     puts ".Lendif#{tree.object_id}:"
+  elsif tree[0] == "while"
+    cond, body = tree[1], tree[2]
+    puts ".Lwhile#{tree.object_id}:"
+    gen(cond, env)
+    puts "\tcmp x0, #0"
+    puts "\tbeq .Lendwhile#{tree.object_id}"
+    gen(body, env)
+    puts "\tb .Lwhile#{tree.object_id}"
+    puts ".Lendwhile#{tree.object_id}:"
   else
     raise "invalid AST: #{tree}"
   end
